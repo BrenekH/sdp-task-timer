@@ -1,6 +1,8 @@
 use std::{
+    collections::HashMap,
     fmt::Display,
-    io,
+    fs, io,
+    path::PathBuf,
     process::Command,
     time::{Duration, Instant},
 };
@@ -56,29 +58,69 @@ enum TimerStatus {
     Stopped,
 }
 
+#[derive(Serialize, Deserialize)]
+struct DataStore {
+    tasks: HashMap<u64, Task>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Task {
+    title: String,
+    sessions: Vec<Session>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Session {
+    duration: Duration,
+}
+
 fn main() {
+    let data_store_path =
+        PathBuf::from("/home/brenekh/.local/state/sdp-task-timer/data_store.json");
+    fs::create_dir_all(data_store_path.parent().unwrap()).unwrap();
+
+    let mut data_store: DataStore = serde_json::from_str(
+        &fs::read_to_string(&data_store_path).unwrap_or("{\"tasks\": {}}".into()),
+    )
+    .unwrap();
+
     let issue = Select::new("Select an issue to work on", get_issue_list().unwrap())
         .prompt()
         .unwrap();
 
-    println!("Starting work on {issue}...\n");
-
     let mut terminal = ratatui::init();
-    let app_result = App::new(issue).run(&mut terminal);
+    let mut app = App::new(&issue);
+    let app_result = app.run(&mut terminal);
     ratatui::restore();
     app_result.unwrap();
+
+    let default_task = Task {
+        title: issue.title.clone(),
+        sessions: vec![],
+    };
+    let task = data_store.tasks.entry(issue.number).or_insert(default_task);
+
+    task.sessions.push(Session {
+        duration: Instant::now() - app.start_time,
+    });
+
+    fs::write(
+        &data_store_path,
+        serde_json::to_string_pretty(&data_store).unwrap(),
+    )
+    .unwrap();
 }
 
 #[derive(Debug)]
-pub struct App {
+pub struct App<'a> {
     start_time: Instant,
     timer_status: TimerStatus,
-    issue: Issue,
+    issue: &'a Issue,
     exit: bool,
 }
 
-impl App {
-    fn new(issue: Issue) -> Self {
+impl<'a> App<'a> {
+    fn new(issue: &'a Issue) -> Self {
         Self {
             start_time: Instant::now(),
             timer_status: TimerStatus::Running,
@@ -129,7 +171,7 @@ impl App {
     }
 }
 
-impl Widget for &App {
+impl<'a> Widget for &'a App<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let title = Line::from(
             format!(
