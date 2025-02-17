@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use inquire::Select;
+use inquire::{Confirm, Select};
 use serde::{Deserialize, Serialize};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
@@ -84,9 +84,31 @@ fn main() {
     )
     .unwrap();
 
-    let issue = Select::new("Select an issue to work on", get_issue_list().unwrap())
+    let issue = Select::new("Select an issue:", get_issue_list().unwrap())
         .prompt()
         .unwrap();
+
+    let default_task = Task {
+        title: issue.title.clone(),
+        sessions: vec![],
+    };
+
+    let time_spent =
+        time_spent_on_task(data_store.tasks.get(&issue.number).unwrap_or(&default_task));
+
+    println!(
+        "You have spent {:.2} minutes on task #{}.\n",
+        time_spent.as_secs_f64() / 60.0,
+        issue.number
+    );
+
+    let start_new_session = Confirm::new("Would you like to start a new session?")
+        .with_default(true)
+        .prompt()
+        .unwrap();
+    if !start_new_session {
+        return;
+    }
 
     let mut terminal = ratatui::init();
     let mut app = App::new(&issue);
@@ -94,10 +116,6 @@ fn main() {
     ratatui::restore();
     app_result.unwrap();
 
-    let default_task = Task {
-        title: issue.title.clone(),
-        sessions: vec![],
-    };
     let task = data_store.tasks.entry(issue.number).or_insert(default_task);
 
     task.sessions.push(Session {
@@ -109,6 +127,19 @@ fn main() {
         serde_json::to_string_pretty(&data_store).unwrap(),
     )
     .unwrap();
+
+    let time_spent =
+        time_spent_on_task(data_store.tasks.get(&issue.number).unwrap());
+
+    println!(
+        "\nYou have now spent {:.2} minutes on task #{}.\n",
+        time_spent.as_secs_f64() / 60.0,
+        issue.number
+    );
+}
+
+fn time_spent_on_task(task: &Task) -> Duration {
+    task.sessions.iter().map(|s| s.duration).sum()
 }
 
 #[derive(Debug)]
