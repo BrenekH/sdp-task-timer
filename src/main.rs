@@ -94,7 +94,7 @@ fn run_gh_command(repo: &str, assignee: AssigneeVariant) -> anyhow::Result<Strin
 enum AssigneeVariant {
     None,
     CurrentUser,
-    User(String),
+//    User(String),
 }
 
 impl Display for AssigneeVariant {
@@ -104,7 +104,7 @@ impl Display for AssigneeVariant {
             match self {
                 AssigneeVariant::None => "no:assignee".to_owned(),
                 AssigneeVariant::CurrentUser => "assignee:@me".to_owned(),
-                AssigneeVariant::User(user) => "assignee".to_owned() + user,
+ //               AssigneeVariant::User(user) => "assignee".to_owned() + user,
             }
         ))
     }
