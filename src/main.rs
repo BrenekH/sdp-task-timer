@@ -21,8 +21,29 @@ impl Display for Issue {
     }
 }
 
+enum Assignee {
+    None,
+    CurrentUser,
+    //    User(String),
+}
+
+impl Display for Assignee {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "{}",
+            match self {
+                Assignee::None => "no:assignee".to_owned(),
+                Assignee::CurrentUser => "assignee:@me".to_owned(),
+                //               AssigneeVariant::User(user) => "assignee".to_owned() + user,
+            }
+        ))
+    }
+}
+
 fn main() {
-    let issue = Select::new("Select an issue to work on", get_issue_list().unwrap()).prompt().unwrap();
+    let issue = Select::new("Select an issue to work on", get_issue_list().unwrap())
+        .prompt()
+        .unwrap();
 
     println!("Starting work on {issue}...\n");
 
@@ -45,13 +66,13 @@ fn timer() -> io::Result<()> {
 }
 
 fn get_issue_list() -> anyhow::Result<Vec<Issue>> {
-    let mut assigned_issues: Vec<Issue> = serde_json::from_str(&run_gh_command(
+    let mut assigned_issues: Vec<Issue> = serde_json::from_str(&run_gh_issue_list(
         "cs481-ekh/s25-sprout-squad",
-        AssigneeVariant::CurrentUser,
+        Assignee::CurrentUser,
     )?)?;
-    let mut unassigned_issues: Vec<Issue> = serde_json::from_str(&run_gh_command(
+    let mut unassigned_issues: Vec<Issue> = serde_json::from_str(&run_gh_issue_list(
         "cs481-ekh/s25-sprout-squad",
-        AssigneeVariant::None,
+        Assignee::None,
     )?)?;
 
     assigned_issues.sort();
@@ -62,7 +83,7 @@ fn get_issue_list() -> anyhow::Result<Vec<Issue>> {
     Ok(assigned_issues)
 }
 
-fn run_gh_command(repo: &str, assignee: AssigneeVariant) -> anyhow::Result<String> {
+fn run_gh_issue_list(repo: &str, assignee: Assignee) -> anyhow::Result<String> {
     let mut cmd = Command::new("gh");
 
     cmd.args([
@@ -89,23 +110,4 @@ fn run_gh_command(repo: &str, assignee: AssigneeVariant) -> anyhow::Result<Strin
     }
 
     Ok(String::from_utf8(result.stdout)?)
-}
-
-enum AssigneeVariant {
-    None,
-    CurrentUser,
-//    User(String),
-}
-
-impl Display for AssigneeVariant {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!(
-            "{}",
-            match self {
-                AssigneeVariant::None => "no:assignee".to_owned(),
-                AssigneeVariant::CurrentUser => "assignee:@me".to_owned(),
- //               AssigneeVariant::User(user) => "assignee".to_owned() + user,
-            }
-        ))
-    }
 }
