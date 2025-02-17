@@ -24,7 +24,7 @@ impl Display for Issue {
 fn main() {
     let issue = Select::new("Select an issue to work on", get_issue_list().unwrap()).prompt().unwrap();
 
-    println!("Starting work on {issue}");
+    println!("Starting work on {issue}...\n");
 
     timer().unwrap();
 }
@@ -53,6 +53,9 @@ fn get_issue_list() -> anyhow::Result<Vec<Issue>> {
         "cs481-ekh/s25-sprout-squad",
         AssigneeVariant::None,
     )?)?;
+
+    assigned_issues.sort();
+    unassigned_issues.sort();
 
     assigned_issues.append(&mut unassigned_issues);
 
