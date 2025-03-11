@@ -8,6 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use config::{load_config, Config};
 use inquire::{Confirm, Select};
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +22,8 @@ use ratatui::{
     widgets::{Block, Paragraph, Widget},
     DefaultTerminal, Frame,
 };
+
+mod config;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
 struct Issue {
@@ -86,10 +89,14 @@ fn main() {
     .unwrap();
 
     let show_all_issues = args().find(|arg| arg == "--all").is_some();
+    let cfg: Config = load_config().unwrap();
 
-    let issue = Select::new("Select an issue:", get_issue_list(show_all_issues).unwrap())
-        .prompt()
-        .unwrap();
+    let issue = Select::new(
+        "Select an issue:",
+        get_issue_list(&cfg.repository, show_all_issues).unwrap(),
+    )
+    .prompt()
+    .unwrap();
 
     let default_task = Task {
         title: issue.title.clone(),
@@ -238,17 +245,11 @@ fn get_timer_text(start_time: &Instant) -> String {
     format!("{:02}:{:02}", elapsed_minutes, elapsed_seconds)
 }
 
-fn get_issue_list(show_all: bool) -> anyhow::Result<Vec<Issue>> {
-    let mut assigned_issues: Vec<Issue> = serde_json::from_str(&run_gh_issue_list(
-        "cs481-ekh/s25-sprout-squad",
-        Assignee::CurrentUser,
-        show_all,
-    )?)?;
-    let mut unassigned_issues: Vec<Issue> = serde_json::from_str(&run_gh_issue_list(
-        "cs481-ekh/s25-sprout-squad",
-        Assignee::None,
-        show_all,
-    )?)?;
+fn get_issue_list(repo: &str, show_all: bool) -> anyhow::Result<Vec<Issue>> {
+    let mut assigned_issues: Vec<Issue> =
+        serde_json::from_str(&run_gh_issue_list(repo, Assignee::CurrentUser, show_all)?)?;
+    let mut unassigned_issues: Vec<Issue> =
+        serde_json::from_str(&run_gh_issue_list(repo, Assignee::None, show_all)?)?;
 
     assigned_issues.sort();
     unassigned_issues.sort();
