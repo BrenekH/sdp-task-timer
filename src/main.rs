@@ -88,7 +88,7 @@ fn main() {
     )
     .unwrap();
 
-    let show_all_issues = args().find(|arg| arg == "--all").is_some();
+    let show_all_issues = args().any(|arg| &arg == "--all");
     let cfg: Config = load_config().unwrap();
 
     let issue = Select::new(
@@ -200,10 +200,7 @@ impl<'a> App<'a> {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
-        match key_event.code {
-            KeyCode::Char('q') => self.exit(),
-            _ => {}
-        }
+        if let KeyCode::Char('q') = key_event.code { self.exit() }
     }
 
     fn exit(&mut self) {
@@ -239,7 +236,7 @@ impl<'a> Widget for &'a App<'a> {
 
 fn get_timer_text(start_time: &Instant) -> String {
     let elapsed_time = Instant::now() - *start_time;
-    let elapsed_minutes = (elapsed_time.as_secs() / 60) as u64;
+    let elapsed_minutes = elapsed_time.as_secs() / 60;
     let elapsed_seconds = elapsed_time.as_secs() - (elapsed_minutes * 60);
 
     format!("{:02}:{:02}", elapsed_minutes, elapsed_seconds)
