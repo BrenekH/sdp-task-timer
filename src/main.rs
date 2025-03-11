@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    env::args,
     fmt::Display,
     fs, io,
     path::PathBuf,
@@ -46,7 +47,7 @@ impl Display for Assignee {
             match self {
                 Assignee::None => "no:assignee".to_owned(),
                 Assignee::CurrentUser => "assignee:@me".to_owned(),
-                // AssigneeVariant::User(user) => "assignee".to_owned() + user,
+                // AssigneeVariant::User(user) => "assignee:".to_owned() + user,
             }
         ))
     }
@@ -84,7 +85,9 @@ fn main() {
     )
     .unwrap();
 
-    let issue = Select::new("Select an issue:", get_issue_list().unwrap())
+    let show_all_issues = args().find(|arg| arg == "--all").is_some();
+
+    let issue = Select::new("Select an issue:", get_issue_list(show_all_issues).unwrap())
         .prompt()
         .unwrap();
 
@@ -128,8 +131,7 @@ fn main() {
     )
     .unwrap();
 
-    let time_spent =
-        time_spent_on_task(data_store.tasks.get(&issue.number).unwrap());
+    let time_spent = time_spent_on_task(data_store.tasks.get(&issue.number).unwrap());
 
     println!(
         "\nYou have now spent {:.2} minutes on task #{}.\n",
@@ -236,14 +238,16 @@ fn get_timer_text(start_time: &Instant) -> String {
     format!("{:02}:{:02}", elapsed_minutes, elapsed_seconds)
 }
 
-fn get_issue_list() -> anyhow::Result<Vec<Issue>> {
+fn get_issue_list(show_all: bool) -> anyhow::Result<Vec<Issue>> {
     let mut assigned_issues: Vec<Issue> = serde_json::from_str(&run_gh_issue_list(
         "cs481-ekh/s25-sprout-squad",
         Assignee::CurrentUser,
+        show_all,
     )?)?;
     let mut unassigned_issues: Vec<Issue> = serde_json::from_str(&run_gh_issue_list(
         "cs481-ekh/s25-sprout-squad",
         Assignee::None,
+        show_all,
     )?)?;
 
     assigned_issues.sort();
@@ -254,7 +258,7 @@ fn get_issue_list() -> anyhow::Result<Vec<Issue>> {
     Ok(assigned_issues)
 }
 
-fn run_gh_issue_list(repo: &str, assignee: Assignee) -> anyhow::Result<String> {
+fn run_gh_issue_list(repo: &str, assignee: Assignee, show_all: bool) -> anyhow::Result<String> {
     let mut cmd = Command::new("gh");
 
     cmd.args([
@@ -264,8 +268,10 @@ fn run_gh_issue_list(repo: &str, assignee: Assignee) -> anyhow::Result<String> {
         "task",
         "--json",
         "number,title",
-        "--repo",
+        "--state",
     ])
+    .arg(if show_all { "all" } else { "open" })
+    .arg("--repo")
     .arg(repo)
     .arg("--search")
     .arg(assignee.to_string());
