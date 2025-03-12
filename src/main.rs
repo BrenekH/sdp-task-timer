@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     env::args,
+    fmt::Display,
     fs, io,
     path::PathBuf,
     time::{Duration, Instant},
@@ -98,7 +99,7 @@ fn main() {
     let task = data_store.tasks.entry(issue.number).or_insert(default_task);
 
     task.sessions.push(Session {
-        duration: Instant::now() - app.start_time,
+        duration: Instant::now() - app.timer.start_time,
     });
 
     fs::write(
@@ -121,9 +122,28 @@ fn time_spent_on_task(task: &Task) -> Duration {
 }
 
 #[derive(Debug)]
-pub struct App<'a> {
+struct Timer {
     start_time: Instant,
     timer_status: TimerStatus,
+    segments: Vec<Duration>,
+}
+
+impl Display for Timer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let elapsed_time = Instant::now() - self.start_time;
+        let elapsed_minutes = elapsed_time.as_secs() / 60;
+        let elapsed_seconds = elapsed_time.as_secs() - (elapsed_minutes * 60);
+
+        f.write_fmt(format_args!(
+            "{:02}:{:02}",
+            elapsed_minutes, elapsed_seconds
+        ))
+    }
+}
+
+#[derive(Debug)]
+pub struct App<'a> {
+    timer: Timer,
     issue: &'a Issue,
     exit: bool,
 }
@@ -131,8 +151,11 @@ pub struct App<'a> {
 impl<'a> App<'a> {
     fn new(issue: &'a Issue) -> Self {
         Self {
-            start_time: Instant::now(),
-            timer_status: TimerStatus::Running,
+            timer: Timer {
+                start_time: Instant::now(),
+                timer_status: TimerStatus::Running,
+                segments: vec![],
+            },
             issue,
             exit: false,
         }
@@ -169,13 +192,19 @@ impl<'a> App<'a> {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
-        if let KeyCode::Char('q') = key_event.code {
-            self.exit()
+        match key_event.code {
+            KeyCode::Char('q') => self.exit(),
+            KeyCode::Char('p') => self.handle_pause(),
+            _ => (),
         }
     }
 
     fn exit(&mut self) {
         self.exit = true;
+    }
+
+    fn handle_pause(&mut self) {
+        self.timer.timer_status = TimerStatus::Stopped;
     }
 }
 
@@ -188,27 +217,22 @@ impl<'a> Widget for &'a App<'a> {
             )
             .bold(),
         );
-        let instructions = Line::from(vec![" Quit ".into(), "<Q> ".blue().bold()]);
+        let instructions = Line::from(vec![
+            " Pause ".into(),
+            "<P> ".blue().bold(),
+            " Quit ".into(),
+            "<Q> ".blue().bold(),
+        ]);
         let block = Block::bordered()
             .title(title.centered())
             .title_bottom(instructions.centered())
             .border_set(border::THICK);
 
-        let counter_text = Text::from(vec![Line::from(vec![
-            get_timer_text(&self.start_time).yellow()
-        ])]);
+        let counter_text = Text::from(vec![Line::from(vec![self.timer.to_string().yellow()])]);
 
         Paragraph::new(counter_text)
             .centered()
             .block(block)
             .render(area, buf);
     }
-}
-
-fn get_timer_text(start_time: &Instant) -> String {
-    let elapsed_time = Instant::now() - *start_time;
-    let elapsed_minutes = elapsed_time.as_secs() / 60;
-    let elapsed_seconds = elapsed_time.as_secs() - (elapsed_minutes * 60);
-
-    format!("{:02}:{:02}", elapsed_minutes, elapsed_seconds)
 }
