@@ -206,19 +206,22 @@ impl<'a> App<'a> {
 
     fn exit(&mut self) {
         self.exit = true;
+
+        if self.timer.status == TimerStatus::Running {
+            self.timer.total_duration += Instant::now() - self.timer.start_time;
+        }
     }
 
     fn handle_pause(&mut self) {
+        use TimerStatus::*;
         self.timer.status = match self.timer.status {
-            TimerStatus::Running => {
+            Running => {
                 self.timer.total_duration += Instant::now() - self.timer.start_time;
-
-                TimerStatus::Stopped
+                Stopped
             }
-            TimerStatus::Stopped => {
+            Stopped => {
                 self.timer.start_time = Instant::now();
-
-                TimerStatus::Running
+                Running
             }
         };
     }
