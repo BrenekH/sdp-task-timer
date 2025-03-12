@@ -26,7 +26,7 @@ use ratatui::{
 mod config;
 mod github;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum TimerStatus {
     Running,
     Stopped,
@@ -99,7 +99,7 @@ fn main() {
     let task = data_store.tasks.entry(issue.number).or_insert(default_task);
 
     task.sessions.push(Session {
-        duration: Instant::now() - app.timer.start_time,
+        duration: app.timer.total_duration,
     });
 
     fs::write(
@@ -123,16 +123,21 @@ fn time_spent_on_task(task: &Task) -> Duration {
 
 #[derive(Debug)]
 struct Timer {
+    total_duration: Duration,
+    status: TimerStatus,
     start_time: Instant,
-    timer_status: TimerStatus,
-    segments: Vec<Duration>,
 }
 
 impl Display for Timer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let elapsed_time = Instant::now() - self.start_time;
-        let elapsed_minutes = elapsed_time.as_secs() / 60;
-        let elapsed_seconds = elapsed_time.as_secs() - (elapsed_minutes * 60);
+        let mut dur = self.total_duration;
+
+        if self.status == TimerStatus::Running {
+            dur += Instant::now() - self.start_time;
+        }
+
+        let elapsed_minutes = dur.as_secs() / 60;
+        let elapsed_seconds = dur.as_secs() - (elapsed_minutes * 60);
 
         f.write_fmt(format_args!(
             "{:02}:{:02}",
@@ -153,8 +158,8 @@ impl<'a> App<'a> {
         Self {
             timer: Timer {
                 start_time: Instant::now(),
-                timer_status: TimerStatus::Running,
-                segments: vec![],
+                status: TimerStatus::Running,
+                total_duration: Duration::new(0, 0),
             },
             issue,
             exit: false,
@@ -204,7 +209,18 @@ impl<'a> App<'a> {
     }
 
     fn handle_pause(&mut self) {
-        self.timer.timer_status = TimerStatus::Stopped;
+        self.timer.status = match self.timer.status {
+            TimerStatus::Running => {
+                self.timer.total_duration += Instant::now() - self.timer.start_time;
+
+                TimerStatus::Stopped
+            }
+            TimerStatus::Stopped => {
+                self.timer.start_time = Instant::now();
+
+                TimerStatus::Running
+            }
+        };
     }
 }
 
@@ -218,7 +234,12 @@ impl<'a> Widget for &'a App<'a> {
             .bold(),
         );
         let instructions = Line::from(vec![
-            " Pause ".into(),
+            (if self.timer.status == TimerStatus::Running {
+                " Pause "
+            } else {
+                " Resume "
+            })
+            .into(),
             "<P> ".blue().bold(),
             " Quit ".into(),
             "<Q> ".blue().bold(),
@@ -228,7 +249,11 @@ impl<'a> Widget for &'a App<'a> {
             .title_bottom(instructions.centered())
             .border_set(border::THICK);
 
-        let counter_text = Text::from(vec![Line::from(vec![self.timer.to_string().yellow()])]);
+        let timer_text = match self.timer.status {
+            TimerStatus::Running => self.timer.to_string().green(),
+            TimerStatus::Stopped => self.timer.to_string().red(),
+        };
+        let counter_text = Text::from(vec![Line::from(vec![timer_text])]);
 
         Paragraph::new(counter_text)
             .centered()
