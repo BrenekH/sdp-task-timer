@@ -18,7 +18,7 @@ use ratatui::{
     layout::Rect,
     style::Stylize,
     symbols::border,
-    text::{Line, Text},
+    text::{Line, Span, Text},
     widgets::{Block, Paragraph, Widget},
     DefaultTerminal, Frame,
 };
@@ -30,6 +30,23 @@ mod github;
 enum TimerStatus {
     Running,
     Stopped,
+}
+
+impl TimerStatus {
+    fn action_text(&self) -> String {
+        match self {
+            TimerStatus::Running => " Pause ",
+            TimerStatus::Stopped => " Resume ",
+        }
+        .into()
+    }
+
+    fn color_timer_text<'a>(&self, text: &'a str) -> Span<'a> {
+        match self {
+            TimerStatus::Running => text.green(),
+            TimerStatus::Stopped => text.red(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -237,12 +254,7 @@ impl<'a> Widget for &'a App<'a> {
             .bold(),
         );
         let instructions = Line::from(vec![
-            (if self.timer.status == TimerStatus::Running {
-                " Pause "
-            } else {
-                " Resume "
-            })
-            .into(),
+            self.timer.status.action_text().into(),
             "<P> ".blue().bold(),
             " Quit ".into(),
             "<Q> ".blue().bold(),
@@ -252,10 +264,8 @@ impl<'a> Widget for &'a App<'a> {
             .title_bottom(instructions.centered())
             .border_set(border::THICK);
 
-        let timer_text = match self.timer.status {
-            TimerStatus::Running => self.timer.to_string().green(),
-            TimerStatus::Stopped => self.timer.to_string().red(),
-        };
+        let t = self.timer.to_string();
+        let timer_text = self.timer.status.color_timer_text(&t);
         let counter_text = Text::from(vec![Line::from(vec![timer_text])]);
 
         Paragraph::new(counter_text)
