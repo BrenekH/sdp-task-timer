@@ -26,8 +26,9 @@ struct Session {
 }
 
 fn main() {
-    let data_store_path =
-        PathBuf::from("/home/brenekh/.local/state/sdp-task-timer/data_store.json");
+    let data_store_path = dirs::data_dir()
+        .unwrap()
+        .join("sdp-task-timer/data_store.json");
     fs::create_dir_all(data_store_path.parent().unwrap()).unwrap();
 
     let mut data_store: DataStore = serde_json::from_str(
