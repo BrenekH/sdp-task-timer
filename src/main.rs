@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env::args, fs, path::PathBuf, time::Duration};
+use std::{collections::HashMap, env::args, fs, time::Duration};
 
 use config::{load_config, Config};
 use inquire::{Confirm, Select};
